@@ -9,8 +9,8 @@ echo [SYS] Creating zero-click Administrator shortcut...
 schtasks /delete /tn "%TASK_NAME%" /f >nul 2>&1
 
 :: 2. Maak de nieuwe taak aan met hoogste privileges
-:: /RL HIGHEST zorgt voor Admin rechten zonder UAC prompt bij uitvoering via schtasks
-schtasks /create /tn "%TASK_NAME%" /tr "\"%SCRIPT_PATH%\"" /sc ONCE /st 00:00 /rl HIGHEST /f
+:: We gebruiken de huidige gebruiker expliciet om UAC bypass te maximaliseren
+schtasks /create /tn "%TASK_NAME%" /tr "\"%SCRIPT_PATH%\"" /sc ONCE /st 00:00 /rl HIGHEST /f /it
 
 if %errorLevel% equ 0 (
     echo [OK] Scheduled Task created.

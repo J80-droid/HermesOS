@@ -14,7 +14,13 @@ echo.
 :: Admin Check & Auto-Elevation
 net session >nul 2>&1
 if %errorLevel% neq 0 (
+    if "%HERMES_ELEVATED%"=="1" (
+        echo [ERROR] Elevation failed even after request. 
+        pause
+        exit /b 1
+    )
     echo [SYS] Requesting Administrator privileges...
+    set "HERMES_ELEVATED=1"
     powershell -Command "Start-Process '%~f0' -Verb RunAs"
     exit /b
 )
