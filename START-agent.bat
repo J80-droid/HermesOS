@@ -74,20 +74,25 @@ echo Starting Docker services...
 docker-compose up -d
 
 :: Wait for healthy
-echo Waiting for containers to be healthy...
+echo Waiting for containers to be ready...
 :docker_loop
-set "all_healthy=true"
+set "all_ready=true"
 for /f "tokens=*" %%i in ('docker ps -q') do (
-    for /f "tokens=*" %%j in ('docker inspect --format="{{.State.Health.Status}}" %%i 2^>nul') do (
+    :: Check if container is running
+    for /f "tokens=*" %%r in ('docker inspect --format="{{.State.Running}}" %%i 2^>nul') do (
+        if "%%r"=="false" set "all_ready=false"
+    )
+    :: Check health if available
+    for /f "tokens=*" %%j in ('docker inspect --format="{{if .State.Health}}{{.State.Health.Status}}{{else}}healthy{{end}}" %%i 2^>nul') do (
         if "%%j"=="unhealthy" (
             echo [ERROR] Container %%i is unhealthy. Check docker logs.
             pause
             exit /b 1
         )
-        if not "%%j"=="healthy" if not "%%j"=="<nil>" set "all_healthy=false"
+        if not "%%j"=="healthy" if not "%%j"=="starting" set "all_ready=false"
     )
 )
-if "!all_healthy!"=="false" (
+if "!all_ready!"=="false" (
     timeout /t 2 >nul
     goto docker_loop
 )
