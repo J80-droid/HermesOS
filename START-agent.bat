@@ -33,10 +33,10 @@ echo Killing conflicting processes...
 taskkill /F /IM hermes_agent.exe /T 2>nul
 taskkill /F /IM hermesos.exe /T 2>nul
 powershell -Command "Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*sidecar_entry.py*' } | Stop-Process -Force" 2>nul
+timeout /t 2 >nul
 
 :: Kill Ports
 echo Reclaiming ports...
-:: 5173: Vite, 1420: Tauri, 9119: Web Server, 8001: Gateway
 :: Port mapping: 5185 (Vite), 1420 (Tauri), 9119 (Web), 8001 (Gateway)
 for %%p in (5185 1420 9119 8001) do (
     for /f "tokens=5" %%a in ('netstat -aon ^| findstr :%%p ^| findstr LISTENING 2^>nul') do (
