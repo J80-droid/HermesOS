@@ -35,4 +35,5 @@ if %errorLevel% equ 0 (
     echo [ERROR] Kon de taak niet aanmaken. Voer dit script eenmalig uit als Administrator.
 )
 
-pause
+timeout /t 5
+exit

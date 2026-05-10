@@ -109,5 +109,6 @@ start "Hermes App" cmd /k "echo [%date% %time%] Starting App >> logs\app.log & c
 
 echo.
 echo [COMPLETE] Hermes Command Center is operational.
-echo.
-pause
+echo [SYS] Closing orchestrator in 3 seconds...
+timeout /t 3 >nul
+exit
