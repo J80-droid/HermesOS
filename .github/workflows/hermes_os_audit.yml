@@ -1,0 +1,221 @@
+name: HermesOS Audit Suite
+
+on:
+  push:
+    paths:
+      - 'HermesOS/**'
+      - '.github/workflows/hermes_os_audit.yml'
+  pull_request:
+    paths:
+      - 'HermesOS/**'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  NODE_VERSION: '22'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  lint:
+    name: Linting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - name: Install frontend dependencies
+        run: cd HermesOS && pnpm install --frozen-lockfile
+
+      - name: ESLint
+        run: cd HermesOS && pnpm lint
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Rust Clippy
+        run: cd HermesOS/src-tauri && cargo clippy --all-targets -- -D warnings
+
+      - name: Rust Format
+        run: cd HermesOS/src-tauri && cargo fmt --check
+
+  unit-tests:
+    name: Unit Tests
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - name: Install frontend dependencies
+        run: cd HermesOS && pnpm install --frozen-lockfile
+
+      - name: TypeScript Tests (Vitest)
+        run: cd HermesOS && pnpm test -- --reporter=verbose
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Unit Tests
+        run: cd HermesOS/src-tauri && cargo test --lib
+
+      - name: Rust Integration Tests
+        run: cd HermesOS/src-tauri && cargo test --test hermesos_integration
+
+  protocol-tests:
+    name: Sidecar Protocol Tests
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-asyncio
+
+      - name: Sidecar Protocol Tests (entry point)
+        run: |
+          cd HermesOS && python -m pytest tests/sidecar_protocol/ -v
+
+  fuzz-tests:
+    name: IPC Fuzz Tests
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+
+      - name: Fuzz Harness Tests
+        run: |
+          cd HermesOS && python -m pytest tests/fuzz/ -v
+
+      - name: Python IPC Fuzzer (static payloads)
+        run: |
+          cd HermesOS && python tests/fuzz/ipc_fuzzer.py --mode static
+
+  configuration-audit:
+    name: Configuration Audit
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Run CSP Checker
+        run: cd HermesOS && python audit/csp_checker.py
+
+      - name: Run Config Validator
+        run: cd HermesOS && python audit/config_validator.py
+
+  dependency-audit:
+    name: Dependency Security Audit
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - name: Install frontend dependencies
+        run: cd HermesOS && pnpm install --frozen-lockfile
+
+      - name: pnpm audit
+        run: cd HermesOS && pnpm audit --audit-level high || true
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-audit
+
+      - name: Rust cargo audit
+        # Ignore list: HermesOS/audit/cargo_audit_ignores.txt (GTK/Linux-only chain via Tauri).
+        run: cd HermesOS && python3 audit/cargo_audit_ci.py || true
+
+  windows-compat:
+    name: Windows Footgun Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Run Windows footgun checker
+        run: cd HermesOS && python audit/windows_footgun_check.py
+
+  summary:
+    name: Audit Summary
+    if: always()
+    needs:
+      - lint
+      - unit-tests
+      - protocol-tests
+      - fuzz-tests
+      - configuration-audit
+      - dependency-audit
+      - windows-compat
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "## HermesOS Audit Suite Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Linting | ${{ needs.lint.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit Tests | ${{ needs.unit-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "| Protocol Tests | ${{ needs.protocol-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "| Fuzz Tests | ${{ needs.fuzz-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "| Config Audit | ${{ needs.configuration-audit.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "| Dependency Audit | ${{ needs.dependency-audit.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "| Windows Compat | ${{ needs.windows-compat.result }}" >> $GITHUB_STEP_SUMMARY
