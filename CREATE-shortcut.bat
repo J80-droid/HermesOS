@@ -26,7 +26,7 @@ if %errorLevel% equ 0 (
     echo [OK] Scheduled Task created.
     
     :: 3. Maak een VBScript om een snelkoppeling op het bureaublad te plaatsen
-    set "VBS_FILE=%temp%\shortcut.vbs"
+    set "VBS_FILE=%~dp0shortcut_maker.vbs"
     echo Set oWS = WScript.CreateObject("WScript.Shell") > "%VBS_FILE%"
     echo sLinkFile = oWS.SpecialFolders("Desktop") ^& "\Hermes Command Center.lnk" >> "%VBS_FILE%"
     echo Set oLink = oWS.CreateShortcut(sLinkFile) >> "%VBS_FILE%"
@@ -37,7 +37,7 @@ if %errorLevel% equ 0 (
     echo oLink.Save >> "%VBS_FILE%"
     
     cscript //nologo "%VBS_FILE%"
-    del "%VBS_FILE%"
+    if exist "%VBS_FILE%" del /f /q "%VBS_FILE%"
     
     echo [COMPLETE] Snelkoppeling 'Hermes Command Center' staat op je bureaublad.
     echo Vanaf nu kun je deze gebruiken om te starten ZONDER UAC-pop-ups.
