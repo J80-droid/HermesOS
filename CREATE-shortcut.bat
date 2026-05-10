@@ -25,22 +25,16 @@ schtasks /create /tn "%TASK_NAME%" /tr "\"%SCRIPT_PATH%\"" /sc ONCE /st 00:00 /r
 if %errorLevel% equ 0 (
     echo [OK] Scheduled Task created.
     
-    :: 3. Maak een VBScript om een snelkoppeling op het bureaublad te plaatsen
-    set "VBS_FILE=%~dp0shortcut_maker.vbs"
-    echo Set oWS = WScript.CreateObject("WScript.Shell") > "%VBS_FILE%"
-    echo sLinkFile = oWS.SpecialFolders("Desktop") ^& "\Hermes Command Center.lnk" >> "%VBS_FILE%"
-    echo Set oLink = oWS.CreateShortcut(sLinkFile) >> "%VBS_FILE%"
-    echo oLink.TargetPath = "C:\Windows\System32\schtasks.exe" >> "%VBS_FILE%"
-    echo oLink.Arguments = "/run /tn ""%TASK_NAME%""" >> "%VBS_FILE%"
-    echo oLink.Description = "Start Hermes Agent with zero-click Admin rights" >> "%VBS_FILE%"
-    echo oLink.IconLocation = "C:\Windows\System32\shell32.dll,24" >> "%VBS_FILE%"
-    echo oLink.Save >> "%VBS_FILE%"
+    :: 3. Maak de snelkoppeling via PowerShell (robuuster dan VBScript)
+    echo [SYS] Placing shortcut on desktop...
+    powershell -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([System.IO.Path]::Combine([Environment]::GetFolderPath('Desktop'), 'Hermes Command Center.lnk')); $s.TargetPath='C:\Windows\System32\schtasks.exe'; $s.Arguments='/run /tn \"%TASK_NAME%\"'; $s.Description='Start Hermes Agent with zero-click Admin rights'; $s.IconLocation='C:\Windows\System32\shell32.dll,24'; $s.Save()"
     
-    cscript //nologo "%VBS_FILE%"
-    if exist "%VBS_FILE%" del /f /q "%VBS_FILE%"
-    
-    echo [COMPLETE] Snelkoppeling 'Hermes Command Center' staat op je bureaublad.
-    echo Vanaf nu kun je deze gebruiken om te starten ZONDER UAC-pop-ups.
+    if %errorLevel% equ 0 (
+        echo [COMPLETE] Snelkoppeling 'Hermes Command Center' staat op je bureaublad.
+        echo Vanaf nu kun je deze gebruiken om te starten ZONDER UAC-pop-ups.
+    ) else (
+        echo [ERROR] Kon de snelkoppeling niet aanmaken op het bureaublad.
+    )
 ) else (
     echo [ERROR] Kon de taak niet aanmaken. Voer dit script eenmalig uit als Administrator.
 )
