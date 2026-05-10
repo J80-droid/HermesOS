@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 setlocal enabledelayedexpansion
 color 06
 title HERMES AGENT - SYSTEM SETUP
@@ -58,7 +59,7 @@ if exist HermesOS (
 echo [3/3] Pulling Docker images...
 where docker >nul 2>&1
 if %errorLevel% == 0 (
-    docker-compose pull
+    docker-compose pull --ignore-pull-failures
 ) else (
     echo [WARNING] Docker not found. Skipping image pull.
 )
