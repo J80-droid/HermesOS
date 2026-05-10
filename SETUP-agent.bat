@@ -10,6 +10,14 @@ echo.
 type branding_setup.txt
 echo.
 
+:: Admin Check & Auto-Elevation
+net session >nul 2>&1
+if %errorLevel% neq 0 (
+    echo [SYS] Requesting Administrator privileges...
+    powershell -Command "Start-Process '%~f0' -Verb RunAs"
+    exit /b
+)
+
 :: Step 1: Python Venv
 echo [1/3] Creating Python Virtual Environment...
 if not exist .venv (

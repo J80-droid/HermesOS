@@ -10,6 +10,14 @@ echo.
 type branding_start.txt
 echo.
 
+:: Admin Check & Auto-Elevation
+net session >nul 2>&1
+if %errorLevel% neq 0 (
+    echo [SYS] Requesting Administrator privileges...
+    powershell -Command "Start-Process '%~f0' -Verb RunAs"
+    exit /b
+)
+
 :: Step 0: Clean Slate
 echo [0] Initializing Clean-Slate Protocol...
 
@@ -35,14 +43,6 @@ docker-compose down 2>nul
 
 :: Step 1: Checks
 echo [1] Running dependency checks...
-
-:: Admin check
-net session >nul 2>&1
-if %errorLevel% neq 0 (
-    echo [ERROR] Please run this script as Administrator.
-    pause
-    exit /b 1
-)
 
 :: Tool checks
 where docker >nul 2>&1 || (echo [ERROR] Docker not found. ^& pause ^& exit /b 1)
