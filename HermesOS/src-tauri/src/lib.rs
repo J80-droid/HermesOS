@@ -7,21 +7,23 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 use tauri_plugin_shell::process::CommandChild;
-use tauri_plugin_shell::ShellExt;
 use tauri_plugin_updater::UpdaterExt;
 
 pub mod log_rotator;
+pub mod sidecar;
 use log_rotator::LogRotator;
 
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
 
-struct AppState {
-    sidecar_child: Arc<Mutex<Option<CommandChild>>>,
-    log_rotator: Arc<Mutex<LogRotator>>,
-    protocol_version: Arc<AtomicU32>,
-    hermes_version: Arc<Mutex<String>>,
+pub(crate) struct AppState {
+    pub(crate) sidecar_spawn_lock: Arc<tokio::sync::Mutex<()>>,
+    pub(crate) sidecar_child: Arc<Mutex<Option<CommandChild>>>,
+    pub(crate) log_rotator: Arc<Mutex<LogRotator>>,
+    pub(crate) protocol_version: Arc<AtomicU32>,
+    pub(crate) hermes_version: Arc<Mutex<String>>,
+    pub(crate) sidecar_io: sidecar::SidecarIoState,
 }
 
 #[derive(Debug, Serialize)]
@@ -120,120 +122,20 @@ pub fn hermes_skills_dir() -> PathBuf {
 // Sidecar management
 // ---------------------------------------------------------------------------
 
-fn get_sidecar_entry_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .join("scripts")
-        .join("sidecar_entry.py")
-}
-
 async fn internal_start_agent<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let entry_script = get_sidecar_entry_path();
-
-    let sidecar_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("binaries");
-    let sidecar_exe = sidecar_dir.join("hermes_agent-x86_64-pc-windows-msvc.exe");
-    let has_real_sidecar = sidecar_exe.exists()
-        && sidecar_exe
-            .metadata()
-            .map(|m| m.len() > 10_000_000)
-            .unwrap_or(false);
-
-    let (mut rx, child) = if has_real_sidecar {
-        tracing::info!("Starting compiled sidecar binary");
-        app.shell()
-            .sidecar("hermes_agent")
-            .unwrap()
-            .spawn()
-            .map_err(|e| format!("Could not start sidecar binary: {}", e))?
-    } else if entry_script.exists() {
-        tracing::info!("Starting sidecar via python (dev mode)");
-        let mut shell_cmd = app.shell().command("python");
-        if cfg!(target_os = "windows") {
-            shell_cmd = shell_cmd
-                .env("PYTHONUTF8", "1")
-                .env("PYTHONIOENCODING", "utf-8");
-        }
-        shell_cmd
-            .arg(entry_script.to_string_lossy().to_string())
-            .spawn()
-            .map_err(|e| format!("Could not start sidecar (python): {}", e))?
-    } else {
-        return Err(format!(
-            "Sidecar binary not found and entry script missing: {:?}",
-            entry_script
-        ));
-    };
-
-    *state.sidecar_child.lock().unwrap() = Some(child);
-
-    let app_out = app.clone();
-    let rotator = state.log_rotator.clone();
-    let pv = state.protocol_version.clone();
-    let hv = state.hermes_version.clone();
-    let child_for_terminate = state.sidecar_child.clone();
-
-    tauri::async_runtime::spawn(async move {
-        while let Some(event) = rx.recv().await {
-            match event {
-                tauri_plugin_shell::process::CommandEvent::Stdout(line_bytes) => {
-                    let text = String::from_utf8_lossy(&line_bytes);
-                    if let Ok(msg) = serde_json::from_str::<serde_json::Value>(&text) {
-                        // Support both legacy "type" and JSON-RPC 2.0 "method"
-                        let method = msg
-                            .get("method")
-                            .and_then(|v| v.as_str())
-                            .or_else(|| msg.get("type").and_then(|v| v.as_str()));
-
-                        if method == Some("sidecar_hello") {
-                            // In JSON-RPC 2.0, hello params are in "params", in legacy they are in "data"
-                            let data = msg.get("params").or_else(|| msg.get("data"));
-                            if let Some(data) = data {
-                                pv.store(
-                                    data.get("protocol_version")
-                                        .and_then(|v| v.as_u64())
-                                        .unwrap_or(0) as u32,
-                                    Ordering::SeqCst,
-                                );
-                                if let Some(ver) =
-                                    data.get("hermes_version").and_then(|v| v.as_str())
-                                {
-                                    *hv.lock().unwrap() = ver.to_string();
-                                }
-                                let _ = app_out.emit("sidecar-ready", &msg);
-                            }
-                        }
-                        let _ = app_out.emit("agent-data", &msg);
-                    } else {
-                        let _ = app_out.emit("agent-raw", text.to_string());
-                    }
-                }
-                tauri_plugin_shell::process::CommandEvent::Stderr(line_bytes) => {
-                    let text = String::from_utf8_lossy(&line_bytes);
-                    if let Ok(mut rot) = rotator.lock() {
-                        let _ = rot.write_line(&text);
-                    }
-                    let _ = app_out.emit("agent-error", text.to_string());
-                }
-                tauri_plugin_shell::process::CommandEvent::Terminated(status) => {
-                    let _ = app_out.emit(
-                        "agent-terminated",
-                        serde_json::json!({
-                            "code": status.code,
-                            "signal": status.signal,
-                        }),
-                    );
-                    *child_for_terminate.lock().unwrap() = None;
-                }
-                _ => {}
-            }
-        }
-    });
-
-    Ok(())
+    sidecar::spawn_sidecar(
+        app,
+        state.sidecar_spawn_lock.clone(),
+        state.sidecar_child.clone(),
+        state.log_rotator.clone(),
+        state.protocol_version.clone(),
+        state.hermes_version.clone(),
+        state.sidecar_io.clone(),
+    )
+    .await
 }
 
 #[tauri::command]
@@ -280,15 +182,8 @@ async fn send_agent_query(
 }
 
 async fn internal_kill_agent(state: State<'_, AppState>) -> Result<(), String> {
-    let mut guard = state.sidecar_child.lock().unwrap();
-    if let Some(child) = guard.take() {
-        child
-            .kill()
-            .map_err(|e| format!("Could not stop sidecar agent: {}", e))
-            .map(|_| ())
-    } else {
-        Ok(())
-    }
+    sidecar::kill_sidecar_child(&state.sidecar_child, &state.sidecar_io);
+    Ok(())
 }
 
 #[tauri::command]
@@ -298,7 +193,7 @@ async fn kill_agent(state: State<'_, AppState>) -> Result<(), String> {
 
 #[tauri::command]
 async fn quit_app<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -> Result<(), String> {
-    internal_kill_agent(state).await?;
+    sidecar::graceful_shutdown_sidecar(state.sidecar_child.clone(), &state.sidecar_io).await;
     app.exit(0);
     Ok(())
 }
@@ -2691,16 +2586,42 @@ pub fn run() {
 
     tauri::Builder::default()
         .manage(AppState {
+            sidecar_spawn_lock: Arc::new(tokio::sync::Mutex::new(())),
             sidecar_child: Arc::new(Mutex::new(None)),
             log_rotator: Arc::new(Mutex::new(LogRotator::new(log_dir, 10, 5))),
             protocol_version: Arc::new(AtomicU32::new(0)),
             hermes_version: Arc::new(Mutex::new(String::new())),
+            sidecar_io: sidecar::SidecarIoState::new(),
         })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let handle = app.handle().clone();
+            let boot = handle.clone();
+            tauri::async_runtime::spawn(async move {
+                let Some(state) = boot.try_state::<AppState>() else {
+                    tracing::error!("HermesOS: AppState ontbreekt bij sidecar auto-start");
+                    return;
+                };
+                if let Err(e) = sidecar::spawn_sidecar(
+                    boot.clone(),
+                    state.sidecar_spawn_lock.clone(),
+                    state.sidecar_child.clone(),
+                    state.log_rotator.clone(),
+                    state.protocol_version.clone(),
+                    state.hermes_version.clone(),
+                    state.sidecar_io.clone(),
+                )
+                .await
+                {
+                    tracing::error!("HermesOS sidecar auto-start mislukt: {}", e);
+                    let _ = boot.emit(
+                        "sidecar-start-error",
+                        serde_json::json!({ "message": e }),
+                    );
+                }
+            });
             if let Some(win) = app.get_webview_window("main") {
                 if let Err(e) = win.maximize() {
                     tracing::warn!("Could not maximize main window on startup: {}", e);
@@ -2777,12 +2698,11 @@ pub fn run() {
         .run(|app_handle, event| {
             if let tauri::RunEvent::Exit = event {
                 if let Some(state) = app_handle.try_state::<AppState>() {
-                    if let Ok(mut guard) = state.sidecar_child.lock() {
-                        if let Some(child) = guard.take() {
-                            tracing::info!("Killing sidecar on app exit");
-                            let _ = child.kill();
-                        }
-                    }
+                    tracing::info!("App exit: HermesOS sidecar graceful shutdown");
+                    tauri::async_runtime::block_on(sidecar::graceful_shutdown_sidecar(
+                        state.sidecar_child.clone(),
+                        &state.sidecar_io,
+                    ));
                 }
             }
         });

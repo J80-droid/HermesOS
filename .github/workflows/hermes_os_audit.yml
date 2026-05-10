@@ -5,9 +5,14 @@ on:
     paths:
       - 'HermesOS/**'
       - '.github/workflows/hermes_os_audit.yml'
+      - 'scripts/pre_commit_hermesos_eslint.py'
+      - '.pre-commit-config.yaml'
   pull_request:
     paths:
       - 'HermesOS/**'
+      - '.github/workflows/hermes_os_audit.yml'
+      - 'scripts/pre_commit_hermesos_eslint.py'
+      - '.pre-commit-config.yaml'
   workflow_dispatch:
 
 env:
@@ -37,6 +42,14 @@ jobs:
 
       - name: ESLint
         run: cd HermesOS && pnpm lint
+
+      - name: Setup Python (architecture — Ruff HermesOS sidecar)
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Ruff architecture audit (no embedded HTTP server imports)
+        run: pip install "ruff==0.15.12" && ruff check --config HermesOS/ruff.toml HermesOS/scripts HermesOS/tests
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable

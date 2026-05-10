@@ -1,0 +1,31 @@
+# HermesOS Python sidecar — aanvullende Ruff-regels (Tauri-architectuur).
+#
+# Gebruik ALLEEN voor paden onder HermesOS die bij de sidecar horen:
+#   ruff check --config HermesOS/ruff.toml HermesOS/scripts HermesOS/tests
+#
+# Waarom geen root pyproject [banned-api] voor fastapi/flask?
+# De hoofdrepo gebruikt FastAPI/Uvicorn voor o.a. `hermes dashboard`; een globaal
+# verbod zou die code breken. Alleen HermesOS-scripts mogen hier geen embedded
+# webserver starten — communicatie loopt via stdio/IPC.
+
+exclude = [
+    "src-tauri/target",
+    ".venv",
+    "venv",
+]
+
+[lint]
+select = ["TID251"]
+
+[lint.flake8-tidy-imports.banned-api]
+"fastapi".msg = "Architectuur Directief (HermesOS): geen lokale webserver — gebruik stdio/IPC."
+"flask".msg = "Architectuur Directief (HermesOS): geen lokale webserver — gebruik stdio/IPC."
+"django".msg = "Architectuur Directief (HermesOS): geen Django-server in de sidecar."
+"starlette.applications".msg = "Architectuur Directief (HermesOS): geen ASGI-app server in de sidecar."
+"uvicorn".msg = "Architectuur Directief (HermesOS): geen ASGI-server proces."
+"gunicorn".msg = "Architectuur Directief (HermesOS): geen WSGI-server."
+"hypercorn".msg = "Architectuur Directief (HermesOS): geen ASGI-server."
+"daphne".msg = "Architectuur Directief (HermesOS): geen ASGI-server."
+"http.server".msg = "Architectuur Directief (HermesOS): geen stdlib HTTP-server."
+"socketserver".msg = "Architectuur Directief (HermesOS): geen stdlib socket server voor HTTP."
+"aiohttp.web".msg = "Architectuur Directief (HermesOS): geen aiohttp web server — aiohttp client blijft elders toegestaan."

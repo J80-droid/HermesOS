@@ -810,6 +810,16 @@ test(tools): add unit tests for file_operations
 
 ---
 
+## HermesOS desktop releases (maintainers)
+
+HermesOS Windows-builds worden gebundeld via Tauri; **getekende auto-updates** vereisen een Minisign **private** key die **nooit** in git hoort, alleen als GitHub Actions secret.
+
+- **Config** (`HermesOS/src-tauri/tauri.conf.json`): `bundle.createUpdaterArtifacts` moet **`true`** zijn voor release-builds die `.sig`-bestanden en updater-ZIP’s moeten genereren. Contributers die lokaal alleen een `.msi`/`.exe` willen testen kunnen tijdens `tauri build` tijdelijk overschrijven met `-c '{"bundle":{"createUpdaterArtifacts":false}}'` (zie `HermesOS/README.md`).
+- **Secrets** (repository → *Settings* → *Secrets and variables* → *Actions*):
+  - `TAURI_SIGNING_PRIVATE_KEY` — private minisign key (volledige PEM-achtige tekst inclusief `untrusted comment:` regels).
+  - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` — optioneel; leeg laten als de key geen wachtwoord heeft.
+- **Workflow**: `.github/workflows/release.yml` — draait op `windows-latest`, bouwt de PyInstaller-sidecar, exporteert embedded `config-metadata.json` / `env-metadata.json`, voert `pnpm run build` en `pnpm exec tauri build --ci` uit, en upload **`.msi`**, **NSIS `.exe`**, en **`*.sig`** naar de GitHub Release voor de betreffende tag.
+
 ## License
 
 By contributing, you agree that your contributions will be licensed under the [MIT License](LICENSE).

@@ -1,0 +1,20 @@
+# HermesOS architecture enforcement (Tauri + IPC — geen localhost HTTP-server in sidecar;
+# frontend geen loopback fetch). Install: pip install pre-commit && pre-commit install
+#
+# Opmerking: we gebruiken géén mirrors-eslint-hook — HermesOS draait ESLint 9 flat config
+# met typescript-eslint/react-plugins; die lossen alleen via HermesOS/node_modules.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.12
+    hooks:
+      - id: ruff
+        args: [--config, HermesOS/ruff.toml]
+        files: ^HermesOS/(scripts|tests)/.*\.py$
+
+  - repo: local
+    hooks:
+      - id: hermesos-eslint-architecture
+        name: HermesOS ESLint (architecture / loopback ban)
+        language: system
+        entry: python scripts/pre_commit_hermesos_eslint.py
+        pass_filenames: false

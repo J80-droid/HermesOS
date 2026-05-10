@@ -1,0 +1,52 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Hermes Agent",
+  "version": "0.1.0",
+  "identifier": "com.jamel.hermesos",
+  "build": {
+    "beforeDevCommand": "pnpm run dev",
+    "beforeBuildCommand": "pnpm run build",
+    "frontendDist": "../dist",
+    "devUrl": "http://127.0.0.1:5185"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Hermes Agent",
+        "width": 1280,
+        "height": 800,
+        "decorations": false,
+        "maximized": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://github.com https://api.github.com https://objects.githubusercontent.com https://raw.githubusercontent.com"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "createUpdaterArtifacts": true,
+    "externalBin": [
+      "binaries/hermes_agent"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnN0ZXVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IERFMEREQjk0NTEzMzJFRjEKUldUeExqTlJsTnNOM2lDdGhxNm8vbDhpK2wzWlYvVk9wWlJraFBhRDZWdlhySG56dmQ2MDlwa0QK",
+      "endpoints": [
+        "https://github.com/NousResearch/hermes-agent/releases/latest/download/latest.json",
+        "https://raw.githubusercontent.com/NousResearch/hermes-agent/main/HermesOS/updater/latest.json"
+      ]
+    }
+  }
+}

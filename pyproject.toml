@@ -200,6 +200,8 @@ exclude = ["tinker-atropos"]
 [tool.ruff]
 exclude = ["tinker-atropos"]
 preview = true  # required for PLW1514 (unspecified-encoding) — preview rule
+# HermesOS desktop sidecar (stdio/IPC only — no embedded HTTP server for app IPC):
+#   ruff check --config HermesOS/ruff.toml HermesOS/scripts HermesOS/tests
 
 [tool.ruff.lint]
 # All other lints are intentionally disabled (see comment history on this
