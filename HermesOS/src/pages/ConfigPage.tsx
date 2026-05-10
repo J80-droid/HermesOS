@@ -180,23 +180,26 @@ export default function ConfigPage() {
   // Set active category when categories load
   useEffect(() => {
     if (categoryOrder.length > 0 && !activeCategory) {
-      setActiveCategory(categoryOrder[0]);
+      Promise.resolve().then(() => setActiveCategory(categoryOrder[0]));
     }
   }, [categoryOrder, activeCategory]);
 
   // Load YAML when switching to YAML mode
   useEffect(() => {
     if (yamlMode) {
-      setYamlLoading(true);
-      api
-        .getConfigRaw()
-        .then((resp) => setYamlText(resp.yaml))
-        .catch(() => showToast(t.config.failedToLoadRaw, "error"))
-        .finally(() => setYamlLoading(false));
+      Promise.resolve().then(() => {
+        setYamlLoading(true);
+        api
+          .getConfigRaw()
+          .then((resp) => setYamlText(resp.yaml))
+          .catch(() => showToast(t.config.failedToLoadRaw, "error"))
+          .finally(() => setYamlLoading(false));
+      });
     }
-  }, [yamlMode]);
+  }, [yamlMode, showToast, t.config.failedToLoadRaw]);
 
   /* ---- Categories ---- */
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const categories = useMemo(() => {
     if (!schema) return [];
     const allCats = [

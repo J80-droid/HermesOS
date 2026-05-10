@@ -7,10 +7,12 @@ export function Toast({ toast }: { toast: { message: string; type: "success" | "
 
   useEffect(() => {
     if (toast) {
-      setCurrent(toast);
-      setVisible(true);
+      Promise.resolve().then(() => {
+        setCurrent(toast);
+        setVisible(true);
+      });
     } else {
-      setVisible(false);
+      Promise.resolve().then(() => setVisible(false));
       const timer = setTimeout(() => setCurrent(null), 200);
       return () => clearTimeout(timer);
     }

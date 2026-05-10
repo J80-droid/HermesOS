@@ -56,9 +56,11 @@ export function OAuthProvidersCard({ onError, onSuccess }: Props) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [loginFor, setLoginFor] = useState<OAuthProvider | null>(null);
   const { t } = useI18n();
-
   const onErrorRef = useRef(onError);
-  onErrorRef.current = onError;
+
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
 
   const refresh = useCallback(() => {
     setLoading(true);
@@ -70,7 +72,7 @@ export function OAuthProvidersCard({ onError, onSuccess }: Props) {
   }, []);
 
   useEffect(() => {
-    refresh();
+    Promise.resolve().then(() => refresh());
   }, [refresh]);
 
   const handleDisconnect = async (provider: OAuthProvider) => {

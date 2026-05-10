@@ -135,7 +135,7 @@ export default function LogsPage() {
   ]);
 
   useEffect(() => {
-    fetchLogs();
+    Promise.resolve().then(() => fetchLogs());
   }, [fetchLogs]);
 
   useEffect(() => {

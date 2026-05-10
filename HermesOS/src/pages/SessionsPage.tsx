@@ -279,12 +279,14 @@ function SessionRow({
 
   useEffect(() => {
     if (isExpanded && messages === null && !loading) {
-      setLoading(true);
-      api
-        .getSessionMessages(session.id)
-        .then((resp) => setMessages(resp.messages))
-        .catch((err) => setError(String(err)))
-        .finally(() => setLoading(false));
+      Promise.resolve().then(() => {
+        setLoading(true);
+        api
+          .getSessionMessages(session.id)
+          .then((resp) => setMessages(resp.messages))
+          .catch((err) => setError(String(err)))
+          .finally(() => setLoading(false));
+      });
     }
   }, [isExpanded, session.id, messages, loading]);
 
@@ -496,7 +498,7 @@ export default function SessionsPage() {
   }, []);
 
   useEffect(() => {
-    loadSessions(page);
+    Promise.resolve().then(() => loadSessions(page));
   }, [loadSessions, page]);
 
   useEffect(() => {
@@ -525,12 +527,14 @@ export default function SessionsPage() {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     if (!search.trim()) {
-      setSearchResults(null);
-      setSearching(false);
+      Promise.resolve().then(() => {
+        setSearchResults(null);
+        setSearching(false);
+      });
       return;
     }
 
-    setSearching(true);
+    Promise.resolve().then(() => setSearching(true));
     debounceRef.current = setTimeout(() => {
       api
         .searchSessions(search.trim())
