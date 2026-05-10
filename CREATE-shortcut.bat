@@ -1,5 +1,15 @@
 @echo off
 cd /d "%~dp0"
+chcp 65001 >nul
+
+:: Admin Check & Auto-Elevation
+net session >nul 2>&1
+if %errorLevel% neq 0 (
+    echo [SYS] Requesting Administrator privileges to register task...
+    powershell -Command "Start-Process '%~f0' -Verb RunAs"
+    exit /b
+)
+
 set "TASK_NAME=HermesAgentLaunch"
 set "SCRIPT_PATH=%~dp0START-agent.bat"
 
