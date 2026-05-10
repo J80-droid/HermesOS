@@ -37,7 +37,8 @@ powershell -Command "Get-Process python -ErrorAction SilentlyContinue | Where-Ob
 :: Kill Ports
 echo Reclaiming ports...
 :: 5173: Vite, 1420: Tauri, 9119: Web Server, 8001: Gateway
-for %%p in (5173 1420 9119 8001) do (
+:: Port mapping: 5185 (Vite), 1420 (Tauri), 9119 (Web), 8001 (Gateway)
+for %%p in (5185 1420 9119 8001) do (
     for /f "tokens=5" %%a in ('netstat -aon ^| findstr :%%p ^| findstr LISTENING 2^>nul') do (
         echo Killing process on port %%p (PID %%a)
         taskkill /F /PID %%a 2>nul
@@ -113,9 +114,10 @@ if exist .venv\Scripts\activate.bat (
 :: Logging
 if not exist logs mkdir logs
 
-:: Parallel Launch
-echo Launching Hermes components...
-start "Hermes Sidecar" cmd /k "echo [%date% %time%] Starting Sidecar >> \"%~dp0logs\sidecar.log\" & python HermesOS\scripts\sidecar_entry.py 2>> \"%~dp0logs\sidecar.log\""
+:: Launch App
+:: Note: Tauri will automatically spawn the sidecar_entry.py process itself.
+:: Manual sidecar launch is removed to prevent resource conflicts.
+echo Launching Hermes App...
 start "Hermes App" cmd /k "echo [%date% %time%] Starting App >> \"%~dp0logs\app.log\" & cd HermesOS ^&^& pnpm tauri dev 2>> \"%~dp0logs\app.log\""
 
 echo.
