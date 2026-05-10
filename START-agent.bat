@@ -115,8 +115,8 @@ if not exist logs mkdir logs
 
 :: Parallel Launch
 echo Launching Hermes components...
-start "Hermes Sidecar" cmd /k "echo [%date% %time%] Starting Sidecar >> logs\sidecar.log & python HermesOS\scripts\sidecar_entry.py 2>> logs\sidecar.log"
-start "Hermes App" cmd /k "echo [%date% %time%] Starting App >> logs\app.log & cd HermesOS ^&^& pnpm tauri dev 2>> logs\app.log"
+start "Hermes Sidecar" cmd /k "echo [%date% %time%] Starting Sidecar >> \"%~dp0logs\sidecar.log\" & python HermesOS\scripts\sidecar_entry.py 2>> \"%~dp0logs\sidecar.log\""
+start "Hermes App" cmd /k "echo [%date% %time%] Starting App >> \"%~dp0logs\app.log\" & cd HermesOS ^&^& pnpm tauri dev 2>> \"%~dp0logs\app.log\""
 
 echo.
 echo [COMPLETE] Hermes Command Center is operational.
